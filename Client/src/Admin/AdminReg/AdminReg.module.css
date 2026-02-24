@@ -1,0 +1,20 @@
+/* Page wrapper */
+.container {
+    margin-left: 260px;   /* sidebar width */
+    margin-top: 80px;     /* navbar height */
+    min-height: calc(100vh - 80px);
+  
+    display: flex;
+    justify-content: center;   /* horizontal center */
+    align-items: center;   /* top alignment */
+  }
+  
+  /* Form card */
+  form {
+    background-color: #ffffff;
+    width: 420px;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+  

@@ -1,0 +1,31 @@
+.Contain {
+    width: 240px;
+    height: 100vh;
+    background-color: #1e293b; /* dark blue-gray */
+    padding-top: 20px;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    left: 0;
+    top: 0;
+  }
+  
+  .Contain div {
+    padding: 12px 20px;
+  }
+  
+  .Contain a {
+    text-decoration: none;
+    color: #e5e7eb; /* light gray */
+    font-size: 15px;
+    display: block;
+    border-radius: 6px;
+    transition: background 0.3s, padding-left 0.3s;
+  }
+  
+  .Contain a:hover {
+    background-color: #334155; /* hover color */
+    padding-left: 28px;
+    color: #ffffff;
+  }
+  
