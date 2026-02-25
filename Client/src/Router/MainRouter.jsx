@@ -12,12 +12,12 @@ import Guestlayout from '../Guest/GuestLayout/Guestlayout'
 const MainRouter = () => {
   return (
     <div>
-          <Routes>
-                  <Route path='admin/*' element={<Adminlayout/>}></Route>
-                <Route path="user/*" element={<Userlayout/>}></Route>
-                <Route path="shop/*" element={<ShopLayout/>}></Route>
-                <Route path="guest/*" element={<Guestlayout/>}></Route>
-          </Routes>
+      <Routes>
+        <Route path='admin/*' element={<Adminlayout />}></Route>
+        <Route path="user/*" element={<Userlayout />}></Route>
+        <Route path="shop/*" element={<ShopLayout />}></Route>
+        <Route path="guest/*" element={<Guestlayout />}></Route>
+      </Routes>
 
     </div>
   )

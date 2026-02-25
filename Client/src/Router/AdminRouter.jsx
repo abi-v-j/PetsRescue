@@ -2,8 +2,6 @@ import React from 'react'
 import Category from '../Admin/Pages/Category/Category'
 import District from '../Admin/Pages/District/District'
 import { Route, Routes } from 'react-router'
-import AdminReg from '../Admin/AdminReg/AdminReg'
-import Place from '../Admin/Place/Place'
 import ViewComplaint from '../Admin/Pages/ViewComplaint/ViewComplaint'
 import Reply from '../Admin/Pages/Reply/Reply'
 import ViewUser from '../Admin/Pages/ViewUser/ViewUser'
@@ -12,6 +10,8 @@ import AcceptedShop from '../Admin/Pages/AcceptedShop/AcceptedShop'
 import { RejectedShop } from '../Admin/Pages/RejectedShop/RejectedShop'
 import VerifiedRescueTeam from '../Admin/Pages/VerifiedRescueTeam/VerifiedRescueTeam'
 import ViewBookings from '../Admin/Pages/ViewBookings/ViewBookings'
+import AdminReg from '../Admin/Pages/AdminReg/AdminReg'
+import Place from '../Admin/Pages/Place/Place'
 
 const AdminRouter = () => {
   return (

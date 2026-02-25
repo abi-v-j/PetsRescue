@@ -2,14 +2,14 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 const MyProfile = () => {
-  const [rescue, setRescue] = useState(null);
+  const [shop, setShop] = useState(null);
 
-  const rid = sessionStorage.getItem("rid");
+  const sid = sessionStorage.getItem("sid");
 
   const loadProfile = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/rescueteam/${rid}`);
-      setRescue(res.data.data);
+      const res = await axios.get(`http://localhost:5000/shop/${sid}`);
+      setShop(res.data.data);
     } catch (err) {
       console.log(err);
       alert("Failed to load profile");
@@ -17,18 +17,18 @@ const MyProfile = () => {
   };
 
   useEffect(() => {
-    if (!rid) {
+    if (!sid) {
       alert("Please login first");
       return;
     }
     loadProfile();
   }, []);
 
-  if (!rescue) return <div>Loading...</div>;
+  if (!shop) return <div>Loading...</div>;
 
   return (
     <div style={{ padding: 20 }}>
-      <h2>Rescue Team Profile</h2>
+      <h2>Shop Profile</h2>
 
       <table border="1" cellPadding="10">
         <tbody>
@@ -36,38 +36,43 @@ const MyProfile = () => {
             <td>Photo</td>
             <td>
               <img
-                src={`http://localhost:5000/uploads/${rescue.rescueTeamPhoto}`}
-                alt="Rescue"
+                src={`http://localhost:5000/uploads/${shop.shopPhoto}`}
+                alt="Shop"
                 width="120"
               />
             </td>
           </tr>
 
           <tr>
-            <td>Name</td>
-            <td>{rescue.rescueTeamName}</td>
+            <td>Shop Name</td>
+            <td>{shop.shopName}</td>
           </tr>
 
           <tr>
             <td>Email</td>
-            <td>{rescue.rescueTeamEmail}</td>
+            <td>{shop.shopEmail}</td>
           </tr>
 
           <tr>
             <td>Address</td>
-            <td>{rescue.rescueTeamAddress}</td>
+            <td>{shop.shopAddress}</td>
+          </tr>
+
+          <tr>
+            <td>Place</td>
+            <td>{shop.placeId?.placeName}</td>
           </tr>
 
           <tr>
             <td>District</td>
-            <td>{rescue.districtId?.districtName}</td>
+            <td>{shop.placeId?.districtId?.districtName}</td>
           </tr>
 
           <tr>
             <td>Proof</td>
             <td>
               <a
-                href={`http://localhost:5000/uploads/${rescue.rescueTeamProof}`}
+                href={`http://localhost:5000/uploads/${shop.shopProof}`}
                 target="_blank"
                 rel="noreferrer"
               >

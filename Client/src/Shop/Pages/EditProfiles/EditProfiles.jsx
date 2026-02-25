@@ -1,30 +1,30 @@
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 
-const EditProfile = () => {
-  const rid = sessionStorage.getItem("rid");
+const EditProfiles = () => {
+  const sid = sessionStorage.getItem("sid");
 
-  const [rescueTeamName, setRescueTeamName] = useState("");
-  const [rescueTeamEmail, setRescueTeamEmail] = useState("");
-  const [rescueTeamAddress, setRescueTeamAddress] = useState("");
+  const [shopName, setShopName] = useState("");
+  const [shopEmail, setShopEmail] = useState("");
+  const [shopAddress, setShopAddress] = useState("");
 
   const [oldPhoto, setOldPhoto] = useState("");
   const [oldProof, setOldProof] = useState("");
 
-  const [rescueTeamPhoto, setRescueTeamPhoto] = useState(null);
-  const [rescueTeamProof, setRescueTeamProof] = useState(null);
+  const [shopPhoto, setShopPhoto] = useState(null);
+  const [shopProof, setShopProof] = useState(null);
 
   const loadProfile = async () => {
     try {
-      const res = await axios.get(`http://localhost:5000/rescueteam/${rid}`);
-      const r = res.data.data;
+      const res = await axios.get(`http://localhost:5000/shop/${sid}`);
+      const s = res.data.data;
 
-      setRescueTeamName(r.rescueTeamName || "");
-      setRescueTeamEmail(r.rescueTeamEmail || "");
-      setRescueTeamAddress(r.rescueTeamAddress || "");
+      setShopName(s.shopName || "");
+      setShopEmail(s.shopEmail || "");
+      setShopAddress(s.shopAddress || "");
 
-      setOldPhoto(r.rescueTeamPhoto || "");
-      setOldProof(r.rescueTeamProof || "");
+      setOldPhoto(s.shopPhoto || "");
+      setOldProof(s.shopProof || "");
     } catch (err) {
       console.log(err);
       alert("Failed to load profile");
@@ -32,7 +32,7 @@ const EditProfile = () => {
   };
 
   useEffect(() => {
-    if (!rid) {
+    if (!sid) {
       alert("Please login first");
       return;
     }
@@ -42,31 +42,31 @@ const EditProfile = () => {
   const handleUpdate = async (e) => {
     e.preventDefault();
 
-    if (!rescueTeamName.trim()) return alert("Enter name");
-    if (!rescueTeamEmail.trim()) return alert("Enter email");
-    if (!rescueTeamAddress.trim()) return alert("Enter address");
+    if (!shopName.trim()) return alert("Enter shop name");
+    if (!shopEmail.trim()) return alert("Enter shop email");
+    if (!shopAddress.trim()) return alert("Enter address");
 
     try {
       const fd = new FormData();
-      fd.append("rescueTeamName", rescueTeamName.trim());
-      fd.append("rescueTeamEmail", rescueTeamEmail.trim());
-      fd.append("rescueTeamAddress", rescueTeamAddress.trim());
+      fd.append("shopName", shopName.trim());
+      fd.append("shopEmail", shopEmail.trim());
+      fd.append("shopAddress", shopAddress.trim());
 
       // optional files
-      if (rescueTeamPhoto) fd.append("rescueTeamPhoto", rescueTeamPhoto);
-      if (rescueTeamProof) fd.append("rescueTeamProof", rescueTeamProof);
+      if (shopPhoto) fd.append("shopPhoto", shopPhoto);
+      if (shopProof) fd.append("shopProof", shopProof);
 
-      const res = await axios.put(`http://localhost:5000/rescueteam/${rid}`, fd, {
+      const res = await axios.put(`http://localhost:5000/shop/${sid}`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
       alert(res.data.message || "Updated");
 
       // clear file inputs
-      setRescueTeamPhoto(null);
-      setRescueTeamProof(null);
-      const photoInput = document.getElementById("rescueTeamPhoto");
-      const proofInput = document.getElementById("rescueTeamProof");
+      setShopPhoto(null);
+      setShopProof(null);
+      const photoInput = document.getElementById("shopPhoto");
+      const proofInput = document.getElementById("shopProof");
       if (photoInput) photoInput.value = "";
       if (proofInput) proofInput.value = "";
 
@@ -79,38 +79,29 @@ const EditProfile = () => {
 
   return (
     <div style={{ padding: 20 }}>
-      <h2>Edit Rescue Team Profile</h2>
+      <h2>Edit Shop Profile</h2>
 
       <form onSubmit={handleUpdate}>
         <table border="1" cellPadding="10">
           <tbody>
             <tr>
-              <td>Name</td>
+              <td>Shop Name</td>
               <td>
-                <input
-                  value={rescueTeamName}
-                  onChange={(e) => setRescueTeamName(e.target.value)}
-                />
+                <input value={shopName} onChange={(e) => setShopName(e.target.value)} />
               </td>
             </tr>
 
             <tr>
               <td>Email</td>
               <td>
-                <input
-                  value={rescueTeamEmail}
-                  onChange={(e) => setRescueTeamEmail(e.target.value)}
-                />
+                <input value={shopEmail} onChange={(e) => setShopEmail(e.target.value)} />
               </td>
             </tr>
 
             <tr>
               <td>Address</td>
               <td>
-                <textarea
-                  value={rescueTeamAddress}
-                  onChange={(e) => setRescueTeamAddress(e.target.value)}
-                />
+                <textarea value={shopAddress} onChange={(e) => setShopAddress(e.target.value)} />
               </td>
             </tr>
 
@@ -133,9 +124,9 @@ const EditProfile = () => {
               <td>New Photo</td>
               <td>
                 <input
-                  id="rescueTeamPhoto"
+                  id="shopPhoto"
                   type="file"
-                  onChange={(e) => setRescueTeamPhoto(e.target.files[0])}
+                  onChange={(e) => setShopPhoto(e.target.files[0])}
                 />
               </td>
             </tr>
@@ -161,9 +152,9 @@ const EditProfile = () => {
               <td>New Proof</td>
               <td>
                 <input
-                  id="rescueTeamProof"
+                  id="shopProof"
                   type="file"
-                  onChange={(e) => setRescueTeamProof(e.target.files[0])}
+                  onChange={(e) => setShopProof(e.target.files[0])}
                 />
               </td>
             </tr>
@@ -180,4 +171,4 @@ const EditProfile = () => {
   );
 };
 
-export default EditProfile;
+export default EditProfiles;

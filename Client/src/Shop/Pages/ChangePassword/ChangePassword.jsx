@@ -2,23 +2,24 @@ import React, { useState } from "react";
 import axios from "axios";
 
 const ChangePassword = () => {
-  const rid = sessionStorage.getItem("rid");
+  const sid = sessionStorage.getItem("sid");
 
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const handleChange = async () => {
-    if (!rid) return alert("Please login first");
+    if (!sid) return alert("Please login first");
 
     if (!oldPassword.trim()) return alert("Enter old password");
     if (!newPassword.trim()) return alert("Enter new password");
     if (!confirmPassword.trim()) return alert("Enter confirm password");
+
     if (newPassword !== confirmPassword) return alert("Password not matching");
 
     try {
       const res = await axios.put(
-        `http://localhost:5000/rescueteam/changepassword/${rid}`,
+        `http://localhost:5000/shop/changepassword/${sid}`,
         { oldPassword, newPassword, confirmPassword }
       );
 
@@ -35,7 +36,7 @@ const ChangePassword = () => {
 
   return (
     <div style={{ padding: 20 }}>
-      <h2>Rescue Team Change Password</h2>
+      <h2>Shop Change Password</h2>
 
       <table border="1" cellPadding="10">
         <tbody>
