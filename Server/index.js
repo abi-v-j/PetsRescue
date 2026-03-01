@@ -123,11 +123,10 @@ const rescueTeamSchema = new mongoose.Schema(
     rescueTeamAddress: { type: String, required: true, trim: true },
     rescueTeamPhoto: { type: String, required: true, trim: true },
     rescueTeamProof: { type: String, required: true, trim: true },
-    districtId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "District",
-      required: true,
-    },
+    districtId: { type: mongoose.Schema.Types.ObjectId, ref: "District", required: true },
+
+    // ✅ ADD THIS
+    rescueTeamStatus: { type: Number, enum: [0, 1, 2], default: 0 }, // 0 pending, 1 accept, 2 reject
   },
   { collection: "rescueteams", timestamps: true }
 );
@@ -158,6 +157,11 @@ const shopSchema = new mongoose.Schema(
     shopProof: { type: String, required: true, trim: true },
     shopPhoto: { type: String, required: true, trim: true },
     shopAddress: { type: String, required: true, trim: true },
+    shopStatus: { 
+      type: Number, 
+      enum: [0, 1, 2], 
+      default: 0   // 0 = pending
+    },
     placeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Place",
@@ -1135,10 +1139,14 @@ app.post("/login", async (req, res) => {
     if (!email) return res.status(400).json({ message: "Email required" });
     if (!password) return res.status(400).json({ message: "Password required" });
 
-    // 1) Admin
-    const admin = await Admin.findOne({ adminEmail: email, adminPassword: password });
+    // ================= ADMIN =================
+    const admin = await Admin.findOne({
+      adminEmail: email,
+      adminPassword: password,
+    });
+
     if (admin) {
-      return res.send({
+      return res.json({
         role: "admin",
         id: admin._id,
         name: admin.adminName,
@@ -1146,10 +1154,14 @@ app.post("/login", async (req, res) => {
       });
     }
 
-    // 2) User
-    const user = await User.findOne({ userEmail: email, userPassword: password });
+    // ================= USER =================
+    const user = await User.findOne({
+      userEmail: email,
+      userPassword: password,
+    });
+
     if (user) {
-      return res.send({
+      return res.json({
         role: "user",
         id: user._id,
         name: user.userName,
@@ -1157,13 +1169,28 @@ app.post("/login", async (req, res) => {
       });
     }
 
-    // 3) Rescue Team
+    // ================= RESCUE TEAM =================
     const rescue = await RescueTeam.findOne({
       rescueTeamEmail: email,
       rescueTeamPassword: password,
     });
+
     if (rescue) {
-      return res.send({
+      // 🔴 CHECK STATUS
+      if (rescue.rescueTeamStatus === 0) {
+        return res.status(403).json({
+          message: "Your account is still pending admin approval",
+        });
+      }
+
+      if (rescue.rescueTeamStatus === 2) {
+        return res.status(403).json({
+          message: "Your account has been rejected by admin",
+        });
+      }
+
+      // ✅ STATUS = 1
+      return res.json({
         role: "rescueteam",
         id: rescue._id,
         name: rescue.rescueTeamName,
@@ -1171,10 +1198,28 @@ app.post("/login", async (req, res) => {
       });
     }
 
-    // 4) Shop
-    const shop = await Shop.findOne({ shopEmail: email, shopPassword: password });
+    // ================= SHOP =================
+    const shop = await Shop.findOne({
+      shopEmail: email,
+      shopPassword: password,
+    });
+
     if (shop) {
-      return res.send({
+      // 🔴 CHECK STATUS
+      if (shop.shopStatus === 0) {
+        return res.status(403).json({
+          message: "Your shop is pending admin approval",
+        });
+      }
+
+      if (shop.shopStatus === 2) {
+        return res.status(403).json({
+          message: "Your shop has been rejected by admin",
+        });
+      }
+
+      // ✅ STATUS = 1
+      return res.json({
         role: "shop",
         id: shop._id,
         name: shop.shopName,
@@ -1182,8 +1227,789 @@ app.post("/login", async (req, res) => {
       });
     }
 
+    // ================= INVALID =================
     return res.status(401).json({ message: "Invalid email or password" });
+
   } catch (err) {
-    return res.status(500).json({ message: "Login failed", error: err.message });
+    return res.status(500).json({
+      message: "Login failed",
+      error: err.message,
+    });
+  }
+});
+
+// GET SHOPS BY STATUS
+app.get("/admin/shops/status/:status", async (req, res) => {
+  try {
+    const { status } = req.params;
+
+    if (![0, 1, 2].includes(Number(status))) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+
+    const shops = await Shop.find({ shopStatus: Number(status) })
+      .populate({
+        path: "placeId",
+        populate: { path: "districtId" }
+      })
+      .sort({ createdAt: -1 });
+
+    res.json({ data: shops });
+  } catch (err) {
+    res.status(500).json({ message: "Fetch Failed", error: err.message });
+  }
+});
+
+app.put("/admin/shops/accept/:id", async (req, res) => {
+  try {
+    const shop = await Shop.findByIdAndUpdate(
+      req.params.id,
+      { shopStatus: 1 },
+      { new: true }
+    );
+
+    if (!shop) return res.status(404).json({ message: "Shop not found" });
+
+    res.json({ message: "Shop Accepted", data: shop });
+  } catch (err) {
+    res.status(400).json({ message: "Accept Failed", error: err.message });
+  }
+});
+
+
+// ✅ USER: VIEW ACCEPTED SHOPS ONLY
+app.get("/shops/accepted", async (req, res) => {
+  try {
+    const shops = await Shop.find({ shopStatus: 1 })
+      .populate({ path: "placeId", populate: { path: "districtId" } })
+      .sort({ createdAt: -1 });
+
+    res.json({ data: shops });
+  } catch (err) {
+    res.status(500).json({ message: "Fetch Failed", error: err.message });
+  }
+});
+
+
+
+app.put("/admin/shops/reject/:id", async (req, res) => {
+  try {
+    const shop = await Shop.findByIdAndUpdate(
+      req.params.id,
+      { shopStatus: 2 },
+      { new: true }
+    );
+
+    if (!shop) return res.status(404).json({ message: "Shop not found" });
+
+    res.json({ message: "Shop Rejected", data: shop });
+  } catch (err) {
+    res.status(400).json({ message: "Reject Failed", error: err.message });
+  }
+});
+
+
+
+// GET RESCUE TEAMS BY STATUS (0/1/2)
+app.get("/admin/rescueteams/status/:status", async (req, res) => {
+  try {
+    const status = Number(req.params.status);
+    if (![0, 1, 2].includes(status)) {
+      return res.status(400).json({ message: "Invalid status" });
+    }
+
+    const teams = await RescueTeam.find({ rescueTeamStatus: status })
+      .populate("districtId")
+      .sort({ createdAt: -1 });
+
+    res.json({ data: teams });
+  } catch (err) {
+    res.status(500).json({ message: "Fetch Failed", error: err.message });
+  }
+});
+
+// ACCEPT RESCUE TEAM => status = 1
+app.put("/admin/rescueteams/accept/:id", async (req, res) => {
+  try {
+    const team = await RescueTeam.findByIdAndUpdate(
+      req.params.id,
+      { rescueTeamStatus: 1 },
+      { new: true }
+    );
+
+    if (!team) return res.status(404).json({ message: "RescueTeam not found" });
+    res.json({ message: "Rescue Team Accepted", data: team });
+  } catch (err) {
+    res.status(400).json({ message: "Accept Failed", error: err.message });
+  }
+});
+
+// REJECT RESCUE TEAM => status = 2
+app.put("/admin/rescueteams/reject/:id", async (req, res) => {
+  try {
+    const team = await RescueTeam.findByIdAndUpdate(
+      req.params.id,
+      { rescueTeamStatus: 2 },
+      { new: true }
+    );
+
+    if (!team) return res.status(404).json({ message: "RescueTeam not found" });
+    res.json({ message: "Rescue Team Rejected", data: team });
+  } catch (err) {
+    res.status(400).json({ message: "Reject Failed", error: err.message });
+  }
+});
+
+
+
+// ================== GALLERY CRUD APIs =======================
+
+// ✅ CREATE (Upload Image) - rescueTeamId from body
+app.post("/gallery", upload.single("galleryFile"), async (req, res) => {
+  try {
+    const { rescueTeamId } = req.body;
+
+    if (!rescueTeamId) {
+      return res.status(400).json({ message: "rescueTeamId required" });
+    }
+
+    const fileName = req.file ? req.file.filename : null;
+
+    if (!fileName) {
+      return res.status(400).json({ message: "galleryFile required" });
+    }
+
+    const created = await Gallery.create({
+      rescueTeamId,
+      galleryFile: fileName,
+    });
+
+    res.status(201).json({ message: "Gallery Added", data: created });
+  } catch (err) {
+    res.status(500).json({ message: "Create Failed", error: err.message });
+  }
+});
+
+
+// ✅ READ ALL (Admin / All)
+app.get("/gallery", async (req, res) => {
+  try {
+    const list = await Gallery.find()
+      .populate("rescueTeamId")
+      .sort({ createdAt: -1 });
+
+    res.json({ data: list });
+  } catch (err) {
+    res.status(500).json({ message: "Fetch Failed", error: err.message });
+  }
+});
+
+
+// ✅ READ BY RESCUE TEAM ID (RescueTeam gallery list)
+app.get("/gallery/byrescue/:rescueTeamId", async (req, res) => {
+  try {
+    const { rescueTeamId } = req.params;
+
+    const list = await Gallery.find({ rescueTeamId })
+      .sort({ createdAt: -1 });
+
+    res.json({ data: list });
+  } catch (err) {
+    res.status(500).json({ message: "Fetch Failed", error: err.message });
+  }
+});
+
+
+// ✅ READ ONE
+app.get("/gallery/:id", async (req, res) => {
+  try {
+    const one = await Gallery.findById(req.params.id).populate("rescueTeamId");
+    if (!one) return res.status(404).json({ message: "Not Found" });
+    res.json({ data: one });
+  } catch (err) {
+    res.status(400).json({ message: "Invalid ID" });
+  }
+});
+
+
+// ✅ DELETE (also delete file from folder)
+app.delete("/gallery/:id", async (req, res) => {
+  try {
+    const deleted = await Gallery.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: "Not Found" });
+
+    // delete file physically
+    const filePath = path.join(__dirname, "public", "uploads", deleted.galleryFile);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    res.json({ message: "Deleted Successfully" });
+  } catch (err) {
+    res.status(400).json({ message: "Delete Failed", error: err.message });
+  }
+});
+
+
+
+
+// ================== PRODUCT CRUD APIs =======================
+
+// ✅ CREATE PRODUCT (Shop adds product)
+app.post("/product", upload.single("productPhoto"), async (req, res) => {
+  try {
+    const { productName, productDetails, productPrice, productStatus, shopId } = req.body;
+
+    if (!productName) return res.status(400).json({ message: "productName required" });
+    if (!productDetails) return res.status(400).json({ message: "productDetails required" });
+    if (!productPrice) return res.status(400).json({ message: "productPrice required" });
+    if (!productStatus) return res.status(400).json({ message: "productStatus required" });
+    if (!shopId) return res.status(400).json({ message: "shopId required" });
+
+    const fileName = req.file ? req.file.filename : null;
+    if (!fileName) return res.status(400).json({ message: "productPhoto required" });
+
+    const created = await Product.create({
+      productName,
+      productDetails,
+      productPrice: Number(productPrice),
+      productStatus,
+      productPhoto: fileName,
+      shopId,
+    });
+
+    res.status(201).json({ message: "Product Created", data: created });
+  } catch (err) {
+    res.status(500).json({ message: "Create Failed", error: err.message });
+  }
+});
+
+
+// ✅ READ ALL PRODUCTS (Admin/all)
+app.get("/product", async (req, res) => {
+  try {
+    const products = await Product.find()
+      .populate({
+        path: "shopId",
+        populate: { path: "placeId", populate: { path: "districtId" } },
+      })
+      .sort({ createdAt: -1 });
+
+    res.json({ data: products });
+  } catch (err) {
+    res.status(500).json({ message: "Fetch Failed", error: err.message });
+  }
+});
+
+
+// ✅ READ PRODUCTS BY SHOP ID (Shop view own products)
+app.get("/product/byshop/:shopId", async (req, res) => {
+  try {
+    const { shopId } = req.params;
+
+    const products = await Product.find({ shopId })
+      .sort({ createdAt: -1 });
+
+    res.json({ data: products });
+  } catch (err) {
+    res.status(500).json({ message: "Fetch Failed", error: err.message });
+  }
+});
+
+
+// ✅ READ ONE
+app.get("/product/:id", async (req, res) => {
+  try {
+    const one = await Product.findById(req.params.id).populate("shopId");
+    if (!one) return res.status(404).json({ message: "Not Found" });
+    res.json({ data: one });
+  } catch (err) {
+    res.status(400).json({ message: "Invalid ID" });
+  }
+});
+
+
+// ✅ UPDATE PRODUCT (photo optional)
+app.put("/product/:id", upload.single("productPhoto"), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { productName, productDetails, productPrice, productStatus } = req.body;
+
+    const old = await Product.findById(id);
+    if (!old) return res.status(404).json({ message: "Not Found" });
+
+    const newPhoto = req.file ? req.file.filename : null;
+
+    const updated = await Product.findByIdAndUpdate(
+      id,
+      {
+        productName: productName ?? old.productName,
+        productDetails: productDetails ?? old.productDetails,
+        productPrice: productPrice ? Number(productPrice) : old.productPrice,
+        productStatus: productStatus ?? old.productStatus,
+        productPhoto: newPhoto ?? old.productPhoto,
+      },
+      { new: true }
+    );
+
+    // ✅ delete old photo if replaced
+    if (newPhoto && old.productPhoto) {
+      const oldPath = path.join(__dirname, "public", "uploads", old.productPhoto);
+      if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+    }
+
+    res.json({ message: "Updated", data: updated });
+  } catch (err) {
+    res.status(500).json({ message: "Update Failed", error: err.message });
+  }
+});
+
+
+// ✅ DELETE PRODUCT (also delete photo)
+app.delete("/product/:id", async (req, res) => {
+  try {
+    const deleted = await Product.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ message: "Not Found" });
+
+    const filePath = path.join(__dirname, "public", "uploads", deleted.productPhoto);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+    res.json({ message: "Deleted Successfully" });
+  } catch (err) {
+    res.status(400).json({ message: "Delete Failed", error: err.message });
+  }
+});
+
+
+// ================== STOCK APIs =======================
+
+// ✅ CREATE OR UPDATE STOCK for product
+app.post("/stock", async (req, res) => {
+  try {
+    const { productId, stockQuantity, stockStatus } = req.body;
+
+    if (!productId) return res.status(400).json({ message: "productId required" });
+    if (stockQuantity === undefined) return res.status(400).json({ message: "stockQuantity required" });
+    if (!stockStatus) return res.status(400).json({ message: "stockStatus required" });
+
+    const qty = Number(stockQuantity);
+    if (isNaN(qty) || qty < 0) return res.status(400).json({ message: "Invalid stockQuantity" });
+
+    // ✅ upsert (if exists update, else create)
+    const updated = await Stock.findOneAndUpdate(
+      { productId },
+      { stockQuantity: qty, stockStatus },
+      { new: true, upsert: true }
+    ).populate("productId");
+
+    res.status(201).json({ message: "Stock saved", data: updated });
+  } catch (err) {
+    res.status(500).json({ message: "Stock save failed", error: err.message });
+  }
+});
+
+
+// ✅ GET STOCK BY PRODUCT ID
+app.get("/stock/byproduct/:productId", async (req, res) => {
+  try {
+    const { productId } = req.params;
+
+    const stock = await Stock.findOne({ productId }).populate("productId");
+
+    res.json({ data: stock }); // can be null if not added yet
+  } catch (err) {
+    res.status(500).json({ message: "Fetch failed", error: err.message });
+  }
+});
+
+
+// ✅ UPDATE STOCK (by stockId) optional
+app.put("/stock/:id", async (req, res) => {
+  try {
+    const { stockQuantity, stockStatus } = req.body;
+
+    const qty = Number(stockQuantity);
+    if (stockQuantity !== undefined && (isNaN(qty) || qty < 0)) {
+      return res.status(400).json({ message: "Invalid stockQuantity" });
+    }
+
+    const updated = await Stock.findByIdAndUpdate(
+      req.params.id,
+      {
+        ...(stockQuantity !== undefined ? { stockQuantity: qty } : {}),
+        ...(stockStatus !== undefined ? { stockStatus } : {}),
+      },
+      { new: true }
+    ).populate("productId");
+
+    if (!updated) return res.status(404).json({ message: "Stock not found" });
+
+    res.json({ message: "Stock updated", data: updated });
+  } catch (err) {
+    res.status(500).json({ message: "Update failed", error: err.message });
+  }
+});
+
+
+
+
+// ================== ADD TO CART (Booking + Cart) ==================
+app.post("/cart/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { productId, cartQuantity } = req.body;
+
+    const qty = Number(cartQuantity || 1);
+
+    if (!userId) return res.status(400).json({ success: false, message: "userId required" });
+    if (!productId) return res.status(400).json({ success: false, message: "productId required" });
+    if (qty <= 0) return res.status(400).json({ success: false, message: "Quantity must be > 0" });
+
+    // 1) get product price
+    const product = await Product.findById(productId);
+    if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+
+    const total = product.productPrice * qty;
+
+    // 2) find existing active booking for same user + product
+    let booking = await Booking.findOne({
+      userId,
+      productId,
+      bookingStatus: "0",
+    });
+
+    // 3) if no booking, create booking (required fields)
+    if (!booking) {
+      const now = new Date();
+
+      booking = await Booking.create({
+        bookingFromDate: now,          // ✅ required
+        bookingToDate: now,            // ✅ required
+        bookingAmount: total,          // ✅ required
+        bookingStatus: "0",            // ✅ pending/cart
+        productId,
+        userId,
+      });
+    }
+
+    // 4) find cart row for this booking+product
+    let cart = await Cart.findOne({
+      bookingId: booking._id,
+      productId,
+    });
+
+    if (cart) {
+      // update qty & total
+      cart.cartQuantity += qty;
+      cart.cartTotal += total;
+      await cart.save();
+
+      // update booking amount to cart total
+      booking.bookingAmount = cart.cartTotal;
+      await booking.save();
+
+      return res.json({
+        success: true,
+        message: "Cart updated",
+        data: { booking, cart },
+      });
+    }
+
+    // 5) create new cart row
+    cart = await Cart.create({
+      cartQuantity: qty,
+      cartTotal: total,
+      productId,
+      bookingId: booking._id,
+    });
+
+    // keep bookingAmount in sync
+    booking.bookingAmount = cart.cartTotal;
+    await booking.save();
+
+    return res.json({
+      success: true,
+      message: "Added to cart",
+      data: { booking, cart },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+    });
+  }
+});
+
+
+
+
+// ✅ GET MY CART (active bookings status "0")
+app.get("/bookingWithCart/:userId", async (req, res) => {
+  try {
+    const userId = req.params.userId;
+
+    const data = await Booking.aggregate([
+      {
+        $match: {
+          userId: new mongoose.Types.ObjectId(userId),
+          bookingStatus: "0",
+        },
+      },
+      {
+        $lookup: {
+          from: "carts",            // ✅ collection name
+          localField: "_id",
+          foreignField: "bookingId",
+          as: "cartItems",
+        },
+      },
+      { $unwind: { path: "$cartItems", preserveNullAndEmptyArrays: false } },
+      {
+        $lookup: {
+          from: "products",         // ✅ collection name
+          localField: "cartItems.productId",
+          foreignField: "_id",
+          as: "productDetails",
+        },
+      },
+      { $unwind: { path: "$productDetails", preserveNullAndEmptyArrays: true } },
+
+      // group back to booking with cart items
+      {
+        $group: {
+          _id: "$_id",
+          bookingFromDate: { $first: "$bookingFromDate" },
+          bookingToDate: { $first: "$bookingToDate" },
+          bookingAmount: { $first: "$bookingAmount" },
+          bookingStatus: { $first: "$bookingStatus" },
+          userId: { $first: "$userId" },
+          cartItems: {
+            $push: {
+              _id: "$cartItems._id",
+              productId: "$cartItems.productId",
+              cartQuantity: "$cartItems.cartQuantity",
+              cartTotal: "$cartItems.cartTotal",
+              product: {
+                _id: "$productDetails._id",
+                productName: "$productDetails.productName",
+                productDetails: "$productDetails.productDetails",
+                productPhoto: "$productDetails.productPhoto",
+                productPrice: "$productDetails.productPrice",
+                productStatus: "$productDetails.productStatus",
+              },
+            },
+          },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+    ]);
+
+    if (!data.length) {
+      return res.json({
+        success: false,
+        message: "Cart is empty",
+        data: null,
+      });
+    }
+
+    // ✅ If multiple bookings exist, return all (recommended)
+    return res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      success: false,
+      message: "Server error",
+      error: err.message,
+    });
+  }
+});
+
+
+
+// ✅ UPDATE CART ITEM QUANTITY
+app.put("/cart/:itemId", async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { quantity } = req.body;
+
+    const qty = Number(quantity);
+    if (!qty || qty < 1) {
+      return res.status(400).json({ success: false, message: "Quantity must be >= 1" });
+    }
+
+    const cartItem = await Cart.findById(itemId);
+    if (!cartItem) return res.status(404).json({ success: false, message: "Cart item not found" });
+
+    const product = await Product.findById(cartItem.productId);
+    if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+
+    cartItem.cartQuantity = qty;
+    cartItem.cartTotal = product.productPrice * qty;
+    await cartItem.save();
+
+    // ✅ Update bookingAmount = sum(cartTotal) for this booking
+    const totals = await Cart.aggregate([
+      { $match: { bookingId: cartItem.bookingId } },
+      { $group: { _id: "$bookingId", total: { $sum: "$cartTotal" } } },
+    ]);
+
+    const newTotal = totals[0]?.total || 0;
+
+    await Booking.findByIdAndUpdate(cartItem.bookingId, {
+      bookingAmount: newTotal,
+    });
+
+    return res.json({
+      success: true,
+      message: "Quantity updated",
+      data: cartItem,
+      bookingAmount: newTotal,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
+  }
+});
+
+
+
+
+// ✅ UPDATE CART ITEM QUANTITY
+app.put("/cart/:itemId", async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { quantity } = req.body;
+
+    const qty = Number(quantity);
+    if (!qty || qty < 1) {
+      return res.status(400).json({ success: false, message: "Quantity must be >= 1" });
+    }
+
+    const cartItem = await Cart.findById(itemId);
+    if (!cartItem) return res.status(404).json({ success: false, message: "Cart item not found" });
+
+    const product = await Product.findById(cartItem.productId);
+    if (!product) return res.status(404).json({ success: false, message: "Product not found" });
+
+    cartItem.cartQuantity = qty;
+    cartItem.cartTotal = product.productPrice * qty;
+    await cartItem.save();
+
+    // ✅ Update bookingAmount = sum(cartTotal) for this booking
+    const totals = await Cart.aggregate([
+      { $match: { bookingId: cartItem.bookingId } },
+      { $group: { _id: "$bookingId", total: { $sum: "$cartTotal" } } },
+    ]);
+
+    const newTotal = totals[0]?.total || 0;
+
+    await Booking.findByIdAndUpdate(cartItem.bookingId, {
+      bookingAmount: newTotal,
+    });
+
+    return res.json({
+      success: true,
+      message: "Quantity updated",
+      data: cartItem,
+      bookingAmount: newTotal,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
+  }
+});
+
+
+
+// ✅ PLACE ORDER (bookingStatus: "0" -> "1")
+app.put("/booking/placeorder/:bookingId", async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
+
+    if (booking.bookingStatus !== "0") {
+      return res.status(400).json({
+        success: false,
+        message: "Only active cart bookings (status 0) can be placed",
+      });
+    }
+
+    // ✅ recalc total from cart
+    const totals = await Cart.aggregate([
+      { $match: { bookingId: booking._id } },
+      { $group: { _id: "$bookingId", total: { $sum: "$cartTotal" }, count: { $sum: 1 } } },
+    ]);
+
+    const totalAmount = totals[0]?.total || 0;
+    const itemCount = totals[0]?.count || 0;
+
+    if (itemCount === 0) {
+      return res.status(400).json({ success: false, message: "Cart is empty" });
+    }
+
+    booking.bookingAmount = totalAmount;
+    booking.bookingStatus = "1"; // ✅ placed order (go to payment)
+    await booking.save();
+
+    res.json({
+      success: true,
+      message: "Order placed. Proceed to payment.",
+      data: booking,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
+  }
+});
+
+
+
+// ✅ GET BOOKING BY ID (for payment page)
+app.get("/booking/:bookingId", async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
+
+    res.json({ success: true, data: booking });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
+  }
+});
+
+
+
+
+// ✅ PAYMENT SUBMIT (bookingStatus: "1" -> "2")
+app.put("/booking/payment/:bookingId", async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+    const { paymentMethod, referenceNo } = req.body; // optional
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) return res.status(404).json({ success: false, message: "Booking not found" });
+
+    if (booking.bookingStatus !== "1") {
+      return res.status(400).json({
+        success: false,
+        message: "Payment allowed only for placed orders (status 1)",
+      });
+    }
+
+    // ✅ Here you can store payment info in another collection if needed,
+    // but you asked only status change, so:
+    booking.bookingStatus = "2"; // ✅ paid
+    await booking.save();
+
+    res.json({ success: true, message: "Payment success. Booking confirmed.", data: booking });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
   }
 });

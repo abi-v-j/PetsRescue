@@ -7,6 +7,7 @@ import EditProfiles from '../User/Pages/EditProfiles/EditProfiles'
 import Userlayout from '../User/UserLayout/Userlayout'
 import ShopLayout from '../Shop/ShopLayout/ShopLayout'
 import Guestlayout from '../Guest/GuestLayout/Guestlayout'
+import RescueTeamLayout from '../RescueTeam/RescueTeamLayout/RescueTeamLayout'
 
 
 const MainRouter = () => {
@@ -17,6 +18,7 @@ const MainRouter = () => {
         <Route path="user/*" element={<Userlayout />}></Route>
         <Route path="shop/*" element={<ShopLayout />}></Route>
         <Route path="guest/*" element={<Guestlayout />}></Route>
+        <Route path="rescueteam/*" element={<RescueTeamLayout />}></Route>
       </Routes>
 
     </div>
